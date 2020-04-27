@@ -24,18 +24,34 @@ class Encoder(nn.Module):
 
 
 class Attention(nn.Module):
-    def __init__(self, enc_hid_dim, dec_hid_dim):
+    def __init__(self, enc_hid_dim, dec_hid_dim, attn_dim):
         super().__init__()
         
         self.enc_hid_dim = enc_hid_dim
         self.dec_hid_dim = dec_hid_dim
+        self.attn_dim = attn_dim
         
-        self.attn = # <YOUR CODE HERE>
+        self.attn_W = nn.Linear(enc_hid_dim + dec_hid_dim, attn_dim) 
+        self.attn_v = nn.Parameter(torch.Tensor(attn_dim, 1))
         
     def forward(self, hidden, encoder_outputs):
-        # <YOUR CODE HERE>
         
-        return 
+        T, B, H = encoder_outputs.shape
+        
+        rep_hidden = hidden.unsqueeze(1).permute(1, 0, 2).repeat(1, T, 1)
+        encoder_outputs = encoder_outputs.permute(1, 0, 2)
+        
+        energy = torch.tanh(
+            self.attn_W(
+                torch.cat((rep_hidden, encoder_outputs), dim=2)
+                )
+            )
+        
+        attn_v = self.attn_v.unsqueeze(0).repeat(B, 1, 1)
+        
+        attention = torch.bmm(energy, attn_v).squeeze(2)
+        
+        return F.softmax(attention, dim=1)
     
     
 class DecoderWithAttention(nn.Module):
@@ -50,14 +66,40 @@ class DecoderWithAttention(nn.Module):
         
         self.embedding = nn.Embedding(output_dim, emb_dim)
         
-        self.rnn = # <YOUR CODE HERE>
+        self.rnn = nn.GRU(enc_hid_dim + emb_dim, dec_hid_dim)
         
-        self.out = # <YOUR CODE HERE>
+        self.out = nn.Linear(enc_hid_dim + dec_hid_dim + emb_dim, output_dim)
         
         self.dropout = nn.Dropout(dropout)
         
     def forward(self, input, hidden, encoder_outputs):
-        # <YOUR CODE HERE>
+        
+        a = self.attention(hidden.squeeze(0), encoder_outputs)
+
+        a = a.unsqueeze(1)
+
+        encoder_outputs = encoder_outputs.permute(1, 0, 2)
+
+        weighted_encoder_out = torch.bmm(a, encoder_outputs)
+
+        weighted_encoder_out = weighted_encoder_out.permute(1, 0, 2)
+        
+        input = input.unsqueeze(0)
+        embedded = self.dropout(self.embedding(input))
+        
+        rnn_input = torch.cat((weighted_encoder_out, embedded), dim=2)
+        
+        output, hidden = self.rnn(rnn_input, hidden)
+        
+        output = output.squeeze(0)
+        embedded = embedded.squeeze(0)
+        weighted_encoder_out = weighted_encoder_out.squeeze(0)
+
+        output = self.out(torch.cat((output,
+                                     weighted_encoder_out,
+                                     embedded), dim = 1))
+        
+        return output, hidden
         
 
 class Seq2Seq(nn.Module):
