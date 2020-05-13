@@ -14,7 +14,7 @@ class DQNAgent(nn.Module):
         # nn.Flatten() can be useful
         state_dim = state_shape[0]
         self.conv1 = nn.Sequential(
-            nn.Conv2d(state_dim, 16, 4, 2),
+            nn.Conv2d(state_dim, 16, 5, 3),
             nn.ReLU()
         )
         self.conv2 = nn.Sequential(
@@ -27,9 +27,9 @@ class DQNAgent(nn.Module):
             nn.Flatten()
         )
         self.dense = nn.Sequential(
-            nn.Linear(64*144, 256),
+            nn.Linear(64*49, 512),
             nn.ReLU(),
-            nn.Linear(256, n_actions)
+            nn.Linear(512, n_actions)
         )
         self.network = nn.Sequential(
             self.conv1,
@@ -87,15 +87,15 @@ class DuelingQAgent(nn.Module):
         # nn.Flatten() can be useful
         state_dim = state_shape[0]
         self.conv1 = nn.Sequential(
-            nn.Conv2d(state_dim, 16, 3, 2),
+            nn.Conv2d(state_dim, 16, 5, 3),
             nn.ReLU()
         )
         self.conv2 = nn.Sequential(
-            nn.Conv2d(16, 32, 3, 2),
+            nn.Conv2d(16, 32, 4, 2),
             nn.ReLU()
         )
         self.conv3 = nn.Sequential(
-            nn.Conv2d(32, 64, 3, 2),
+            nn.Conv2d(32, 64, 3, 1),
             nn.ReLU(),
             nn.Flatten()
         )
@@ -105,14 +105,14 @@ class DuelingQAgent(nn.Module):
             self.conv3
         )
         self.head_V = nn.Sequential(
-            nn.Linear(64*49, 256),
+            nn.Linear(64*49, 512),
             nn.ReLU(),
-            nn.Linear(256, 1)
+            nn.Linear(512, 1)
         )
         self.head_A = nn.Sequential(
-            nn.Linear(64*49, 256),
+            nn.Linear(64*49, 512),
             nn.ReLU(),
-            nn.Linear(256, n_actions)
+            nn.Linear(512, n_actions)
         )
         
 
@@ -124,13 +124,13 @@ class DuelingQAgent(nn.Module):
         # Use your network to compute qvalues for given state
         conved_features = self.conv_layers(state_t)
         A = self.head_A(conved_features)
-        V = self.head_V(conved_features).repeat(1, n_actions)
-        mean_A = torch.mean(A, dim=-1, keepdim=True).repeat(1, n_actions)
+        V = self.head_V(conved_features).repeat(1, self.n_actions)
+        mean_A = torch.mean(A, dim=-1, keepdim=True).repeat(1, self.n_actions)
         qvalues = A + V - mean_A
 
         assert qvalues.requires_grad, "qvalues must be a torch tensor with grad"
         assert len(
-            qvalues.shape) == 2 and qvalues.shape[0] == state_t.shape[0] and qvalues.shape[1] == n_actions
+            qvalues.shape) == 2 and qvalues.shape[0] == state_t.shape[0] and qvalues.shape[1] == self.n_actions
 
         return qvalues
 
@@ -213,9 +213,9 @@ class NoisyDQNAgent(DQNAgent):
         super(DQNAgent).__init__(state_shape, n_actions)
         
         self.dense = nn.Sequential(
-            NoisyLinear(64*144, 256),
+            NoisyLinear(64*49, 512),
             nn.ReLU(),
-            NoisyLinear(256, n_actions)
+            NoisyLinear(512, n_actions)
         )
         
 
